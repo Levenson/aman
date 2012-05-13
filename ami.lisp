@@ -6,19 +6,30 @@
 ;; Maintainer: 
 ;; Created: Sat May 12 13:20:48 2012 (+0400)
 ;; Version: 
-;; Last-Updated: Sun May 13 12:49:44 2012 (+0400)
-;;           By: User Alex
-;;     Update #: 66
+;; Last-Updated: Sun May 13 23:34:57 2012 (+0400)
+;;           By: alex
+;;     Update #: 85
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (in-package :cl-user)
 
 (defpackage ami
   (:use :cl :asdf :iolib)
-  (:export :ami-session))
+  (:export :ami-session
+	   :send-action
+	   :%make-ami-session
+	   :%make-ami-action
+	   :get-respond
+	   :close-session))
 
 (in-package :ami)
 
+
+(defun string-split (devider string)
+  (if (null (position devider string))
+      (list (string-trim " " string))
+      (append  (list (subseq string 0 (position devider string)))
+               (string-split devider (subseq string (+ 1 (position devider string)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Action
@@ -57,18 +68,19 @@
   (let  ((socket (ami-session-socket object)))
     (format socket "Action: ~a~%" (ami-action-name action))
     (format socket "ActionID: ~a~%" (ami-action-id action))
+    ;; Write Keys
     (dolist (key/value (ami-action-argv action))
       (format socket "~a: ~a~%" (car key/value) (cdr key/value)))
     (finish-output socket)))
 
 (defmethod get-respond ((object ami-session))
-  (let ((socket (ami-session-socket object)))
-    (format t "~a~%" (read-line socket))
-    ;; (do ((line (read-line socket nil)
-    ;; 	   (read-line socket nil)))
-    ;;     ((equal line ""))
-    ;;   (format t "~a~%" line))
-    ))
+  (let ((result '()) (socket (ami-session-socket object)))
+    (do ((line (read-line socket nil "")
+	       (read-line socket nil "")))
+	((string= line ""))
+      (format t "~S"  (string-split #\: line))
+      (push (string-split #\: line) result))
+    (values result)))
 
 (defmethod close-session ((object ami-session))
   (close (ami-session-socket object)))

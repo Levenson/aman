@@ -5,9 +5,9 @@
 ;; Maintainer: 
 ;; Created: Sat May 12 17:06:59 2012 (+0400)
 ;; Version: 
-;; Last-Updated: Sun May 13 12:49:42 2012 (+0400)
-;;           By: User Alex
-;;     Update #: 32
+;; Last-Updated: Sun May 13 23:35:02 2012 (+0400)
+;;           By: alex
+;;     Update #: 56
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (in-package :aman)
@@ -15,21 +15,21 @@
 (defvar *event-base*)
 
 (defun make-ami-session (host port username secret &optional &key (events nil))
-  (let ((socket (make-socket :connect :active
-                             :address-family :internet
-                             :type :stream
-                             :external-format '(:utf-8 :eol-style :crlf)
-                             :ipv6 nil)))
-    (connect socket (lookup-hostname host) :port port :wait t)
-
-    (let ((ami (ami::%make-ami-session :host host
-				       :port port
-				       :username username
-				       :secret secret
-				       :events events
-				       :socket socket)))
-
-      (ami::get-respond ami)   ami)))
+  (let ((socket (make-socket :connect :active :address-family :internet
+			     :type :stream :external-format '(:utf-8 :eol-style :crlf)
+			     :ipv6 nil)))
+    (let ((ami (%make-ami-session :host host :port port
+				  :username username :secret secret
+				  :events events :socket socket)))
+      (handler-case
+	  (progn
+	    (connect socket (lookup-hostname host) :port port :wait t)
+	    ;; Read hello.
+	    (read-line socket)
+	    (send-action ami (%make-ami-action :name "login" :id 1 :argv
+					       (list (cons "username" username)
+						     (cons "secret" secret))))
+	    ami)))))
 
 (defun client-disconnector (socket)
   ;; When this function is called, it can be told which callback to remove, if
@@ -77,5 +77,11 @@
         (close *event-base*))
       (format t "Client Exited.~%"))))
 
+(defmacro with-ami-session ((var &rest argv) &body body)
+  `(let ((,var (make-ami-session ,@argv)))
+     (unwind-protect
+	  (progn
+	    ,@body)
+       (ami::close-session ,var))))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; aman.lisp ends here
