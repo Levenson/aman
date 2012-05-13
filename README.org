@@ -1,0 +1,2 @@
+* General Information
+aman [ Asterisk MANager ] is a module for interacting with the Asterisk Manager Interface.
